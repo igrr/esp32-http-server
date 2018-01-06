@@ -384,6 +384,17 @@ int http_request_get_method(http_context_t ctx)
     return (int) ctx->parser.method;
 }
 
+const char* http_request_get_arg_value(http_context_t ctx, const char* name)
+{
+    http_header_t* it;
+    SLIST_FOREACH(it, &ctx->request_args, list_entry) {
+        if (strcasecmp(name, it->name) == 0) {
+            return it->value;
+        }
+    }
+    return NULL;
+}
+
 esp_err_t http_request_get_data(http_context_t ctx, const char** out_data_ptr, size_t* out_size)
 {
     if (ctx->event != HTTP_HANDLE_DATA) {

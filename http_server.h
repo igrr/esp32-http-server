@@ -131,12 +131,12 @@ esp_err_t http_register_form_handler(http_server_t server, const char* uri_patte
                                     int events, http_handler_fn_t callback, void* callback_arg);
 
 /**
- * @brief Get value for given form item name
+ * @brief Get value for given URL argument of form argument
  * @param http_ctx  context passed to the handler
- * @param name  name of form item
- * @return  pointer to the form item value, valid until the end of request
+ * @param name  name of URL or form argument
+ * @return  pointer to the value, valid until the end of request
  */
-const char* http_request_get_form_value(http_context_t http_ctx, const char* name);
+const char* http_request_get_arg_value(http_context_t http_ctx, const char* name);
 
 /**
  * @brief Get request method
