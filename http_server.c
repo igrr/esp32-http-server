@@ -388,6 +388,7 @@ const char* http_request_get_arg_value(http_context_t ctx, const char* name)
 {
     http_header_t* it;
     SLIST_FOREACH(it, &ctx->request_args, list_entry) {
+        ESP_LOGD(TAG, "Key %s: %s", it->name, it->value);
         if (strcasecmp(name, it->name) == 0) {
             return it->value;
         }
@@ -415,7 +416,7 @@ static void form_data_handler_cb(http_context_t http_ctx, void* ctx)
         const char* str;
         size_t len;
         http_request_get_data(http_ctx, &str, &len);
-        parse_urlencoded_args(ctx, str, len);
+        parse_urlencoded_args(http_ctx, str, len);
     }
 }
 
