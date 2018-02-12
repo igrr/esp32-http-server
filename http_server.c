@@ -111,6 +111,22 @@ static esp_err_t add_keyval_pair(http_header_list_t *list, const char* name, con
 
 static const char* TAG = "http_server";
 
+const static char index_html[] = "<!DOCTYPE html>"
+      "<html>\n"
+      "<head>\n"
+      "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+      "  <style type=\"text/css\">\n"
+      "    html, body, iframe { margin: 0; padding: 0; height: 100%; }\n"
+      "    iframe { display: block; width: 100%; border: none; }\n"
+      "  </style>\n"
+      "<title>HELLO ESP32</title>\n"
+      "</head>\n"
+      "<body>\n"
+      "<h1>Hello World, from ESP32!</h1>\n"
+      "</body>\n"
+      "</html>\n";
+
+
 esp_err_t http_register_handler(http_server_t server,
         const char* uri_pattern, int method,
         int events, http_handler_fn_t callback, void* callback_arg)
@@ -817,4 +833,32 @@ esp_err_t http_server_stop(http_server_t server)
     xEventGroupWaitBits(server->start_done, SERVER_DONE_BIT, 0, 0, portMAX_DELAY);
     free(server);
     return ESP_OK;
+}
+
+static void cb_GET_method(http_context_t http_ctx, void* ctx)
+{
+    size_t response_size = strlen(index_html);
+    http_response_begin(http_ctx, 200, "text/html", response_size);
+    http_buffer_t http_index_html = { .data = index_html };
+    http_response_write(http_ctx, &http_index_html);
+    http_response_end(http_ctx);
+}
+
+esp_err_t simple_GET_method_example(void)
+{
+	http_server_t server;
+	http_server_options_t http_options = HTTP_SERVER_OPTIONS_DEFAULT();
+	esp_err_t res;
+
+	res =  http_server_start(&http_options, &server);
+	if (res != ESP_OK) {
+		return res;
+	}
+
+	res = http_register_handler(server, "/", HTTP_GET, HTTP_HANDLE_RESPONSE, &cb_GET_method, NULL);
+	if (res != ESP_OK) {
+		return res;
+	}
+
+	return res;
 }

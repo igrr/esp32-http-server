@@ -285,6 +285,16 @@ esp_err_t http_response_write(http_context_t http_ctx, const http_buffer_t* buff
  */
 esp_err_t http_response_end(http_context_t http_ctx);
 
+/**
+ * @brief Example of GET method. Responding a simple "Hello World" html. All initializations included.
+ * @param none
+ * @return
+ *      - ESP_OK on success
+ *      - other errors in the future?
+ */
+esp_err_t simple_GET_method_example(void);
+
+
 #ifdef __cplusplus
 }
 #endif
