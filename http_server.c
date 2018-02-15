@@ -126,6 +126,9 @@ const static char index_html[] = "<!DOCTYPE html>"
       "</body>\n"
       "</html>\n";
 
+const static char response_OK[] =
+	"OK!\n";
+
 
 esp_err_t http_register_handler(http_server_t server,
         const char* uri_pattern, int method,
@@ -856,6 +859,46 @@ esp_err_t simple_GET_method_example(void)
 	}
 
 	res = http_register_handler(server, "/", HTTP_GET, HTTP_HANDLE_RESPONSE, &cb_GET_method, NULL);
+	if (res != ESP_OK) {
+		return res;
+	}
+
+	return res;
+}
+
+static void cb_POST_method(http_context_t http_ctx, void* ctx)
+{
+	const char* post_data;
+
+	ESP_LOGI(TAG, "Received data from POST method...");
+
+	/*Receiving key from POST*/
+	post_data = http_request_get_arg_value(http_ctx, "key");
+	if(post_data!=NULL){
+		ESP_LOGI(TAG, "Received %d bytes corresponding to the 'key': %s", strlen(post_data), post_data);
+	}else{
+		ESP_LOGI(TAG, "Received NULL from POST method");
+	}
+
+	size_t response_size = strlen(response_OK);
+	http_response_begin(http_ctx, 201, "text/plain", response_size);
+	http_buffer_t http_response_OK = { .data = response_OK };
+	http_response_write(http_ctx, &http_response_OK);
+	http_response_end(http_ctx);
+}
+
+esp_err_t simple_POST_method_example(void)
+{
+	http_server_t server;
+	http_server_options_t http_options = HTTP_SERVER_OPTIONS_DEFAULT();
+	esp_err_t res;
+
+	res =  http_server_start(&http_options, &server);
+	if (res != ESP_OK) {
+		return res;
+	}
+
+	res = http_register_form_handler(server, "/", HTTP_POST, HTTP_HANDLE_RESPONSE, &cb_POST_method, NULL);
 	if (res != ESP_OK) {
 		return res;
 	}

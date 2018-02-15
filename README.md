@@ -29,6 +29,11 @@ Examples functions at http server
 * Server initialization added into the example function, simply call it and it should work!
 * Receiving a GET request at /, http server response is a "Hello World, from ESP32!" html.
 
+## POST Method Example
+`simple_POST_method_example()` function:
+* As well as GET example, simply add http_server as a componente into your ESP-IDF project.
+* Server initialization added into the POST example function, simply call it and don't worry.
+* Post to / a pair of key-value where the key is 'key' and value some value you want to test. The example will show value content. If needed, increade log verbosity at `make menuconfig` to show all parsed key-value pairs.
 
 # Debugging
 

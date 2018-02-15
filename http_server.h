@@ -294,6 +294,14 @@ esp_err_t http_response_end(http_context_t http_ctx);
  */
 esp_err_t simple_GET_method_example(void);
 
+/**
+ * @brief Example of POST method. Send a application/x-www-form-urlencoded pair key-value where the key is 'key' and some value for it. The value is printed and the server responds a 201 code and a OK message.
+ * @param none
+ * @return
+ *      - ESP_OK on success
+ *      - other errors in the future?
+ */
+esp_err_t simple_POST_method_example(void);
 
 #ifdef __cplusplus
 }
