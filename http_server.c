@@ -111,6 +111,25 @@ static esp_err_t add_keyval_pair(http_header_list_t *list, const char* name, con
 
 static const char* TAG = "http_server";
 
+const static char index_html[] = "<!DOCTYPE html>"
+      "<html>\n"
+      "<head>\n"
+      "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+      "  <style type=\"text/css\">\n"
+      "    html, body, iframe { margin: 0; padding: 0; height: 100%; }\n"
+      "    iframe { display: block; width: 100%; border: none; }\n"
+      "  </style>\n"
+      "<title>HELLO ESP32</title>\n"
+      "</head>\n"
+      "<body>\n"
+      "<h1>Hello World, from ESP32!</h1>\n"
+      "</body>\n"
+      "</html>\n";
+
+const static char response_OK[] =
+	"OK!\n";
+
+
 esp_err_t http_register_handler(http_server_t server,
         const char* uri_pattern, int method,
         int events, http_handler_fn_t callback, void* callback_arg)
@@ -388,6 +407,7 @@ const char* http_request_get_arg_value(http_context_t ctx, const char* name)
 {
     http_header_t* it;
     SLIST_FOREACH(it, &ctx->request_args, list_entry) {
+        ESP_LOGD(TAG, "Key %s: %s", it->name, it->value);
         if (strcasecmp(name, it->name) == 0) {
             return it->value;
         }
@@ -415,7 +435,7 @@ static void form_data_handler_cb(http_context_t http_ctx, void* ctx)
         const char* str;
         size_t len;
         http_request_get_data(http_ctx, &str, &len);
-        parse_urlencoded_args(ctx, str, len);
+        parse_urlencoded_args(http_ctx, str, len);
     }
 }
 
@@ -816,4 +836,72 @@ esp_err_t http_server_stop(http_server_t server)
     xEventGroupWaitBits(server->start_done, SERVER_DONE_BIT, 0, 0, portMAX_DELAY);
     free(server);
     return ESP_OK;
+}
+
+static void cb_GET_method(http_context_t http_ctx, void* ctx)
+{
+    size_t response_size = strlen(index_html);
+    http_response_begin(http_ctx, 200, "text/html", response_size);
+    http_buffer_t http_index_html = { .data = index_html };
+    http_response_write(http_ctx, &http_index_html);
+    http_response_end(http_ctx);
+}
+
+esp_err_t simple_GET_method_example(void)
+{
+	http_server_t server;
+	http_server_options_t http_options = HTTP_SERVER_OPTIONS_DEFAULT();
+	esp_err_t res;
+
+	res =  http_server_start(&http_options, &server);
+	if (res != ESP_OK) {
+		return res;
+	}
+
+	res = http_register_handler(server, "/", HTTP_GET, HTTP_HANDLE_RESPONSE, &cb_GET_method, NULL);
+	if (res != ESP_OK) {
+		return res;
+	}
+
+	return res;
+}
+
+static void cb_POST_method(http_context_t http_ctx, void* ctx)
+{
+	const char* post_data;
+
+	ESP_LOGI(TAG, "Received data from POST method...");
+
+	/*Receiving key from POST*/
+	post_data = http_request_get_arg_value(http_ctx, "key");
+	if(post_data!=NULL){
+		ESP_LOGI(TAG, "Received %d bytes corresponding to the 'key': %s", strlen(post_data), post_data);
+	}else{
+		ESP_LOGI(TAG, "Received NULL from POST method");
+	}
+
+	size_t response_size = strlen(response_OK);
+	http_response_begin(http_ctx, 201, "text/plain", response_size);
+	http_buffer_t http_response_OK = { .data = response_OK };
+	http_response_write(http_ctx, &http_response_OK);
+	http_response_end(http_ctx);
+}
+
+esp_err_t simple_POST_method_example(void)
+{
+	http_server_t server;
+	http_server_options_t http_options = HTTP_SERVER_OPTIONS_DEFAULT();
+	esp_err_t res;
+
+	res =  http_server_start(&http_options, &server);
+	if (res != ESP_OK) {
+		return res;
+	}
+
+	res = http_register_form_handler(server, "/", HTTP_POST, HTTP_HANDLE_RESPONSE, &cb_POST_method, NULL);
+	if (res != ESP_OK) {
+		return res;
+	}
+
+	return res;
 }
