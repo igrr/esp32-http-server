@@ -415,7 +415,7 @@ static void form_data_handler_cb(http_context_t http_ctx, void* ctx)
         const char* str;
         size_t len;
         http_request_get_data(http_ctx, &str, &len);
-        parse_urlencoded_args(ctx, str, len);
+        parse_urlencoded_args(http_ctx, str, len);
     }
 }
 
