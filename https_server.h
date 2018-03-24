@@ -27,6 +27,8 @@ extern "C" {
  * @brief Simple HTTP server
  */
 
+#include "sdkconfig.h"
+
 /* Pull in the definitions of HTTP methods */
 #include "http_parser.h"
 
@@ -37,6 +39,12 @@ extern "C" {
 #define HTTP_HANDLE_HEADERS     BIT(1)      /*!< Called when all headers are received */
 #define HTTP_HANDLE_DATA        BIT(2)      /*!< Called each time a fragment of request body is received */
 #define HTTP_HANDLE_RESPONSE    BIT(3)      /*!< Called at the end of the request to produce the response */
+
+/** Error buffer length */
+#define ERROR_BUF_LENGTH 		100
+
+/** Uncomment to enable secure server */
+#define HTTPS_SERVER
 
 /** Opaque type representing single HTTP connection */
 typedef struct http_context_* http_context_t;
@@ -63,6 +71,14 @@ typedef struct {
     .task_affinity = tskNO_AFFINITY, \
     .task_stack_size = 4096, \
     .task_priority = 1, \
+}
+
+/** Default initializer for http_server_options_t */
+#define HTTPS_SERVER_OPTIONS_DEFAULT()  {\
+    .port = 443, \
+    .task_affinity = tskNO_AFFINITY, \
+    .task_stack_size = 10240, \
+    .task_priority = 8, \
 }
 
 /**
