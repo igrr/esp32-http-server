@@ -1,25 +1,19 @@
-# Simple HTTP server
+# Simple HTTP/HTTPS server
 
-This is a very minimal HTTP server I use in some of the projects.
-
-Absolutely not ready for any kind of production use.
-
+This is a very minimal HTTP server. Optionally supports HTTPS server based on mbedTLS server example. 
 
 # How to use
 
-Really, please see above note.
-
 This directory is an ESP-IDF component. Clone it (or add it as a submodule) into the component directory of the project.
-
+Enable TLS/SSL HTTPS server by uncommenting the `#define HTTPS_SERVER` line at `https_server.h`, otherwise it will implement unsecured http server. Server certificate and private key are loaded at `https_server.c` directly into flash code as in the [`open_ssl_server`](https://github.com/espressif/esp-idf/tree/master/examples/protocols/openssl_server) example from ESP-IDF repository. Don't forget to insert [`cacert.pem`](https://github.com/espressif/esp-idf/blob/master/examples/protocols/openssl_server/main/cacert.pem) and [`prvtkey.pem`](https://github.com/espressif/esp-idf/blob/master/examples/protocols/openssl_server/main/prvtkey.pem) at your main application directory if you want to run GET/POST examples.
 
 # Documentation
 
 None yet, but I tried to make the comments in the header file helpful.
 
-
 # Examples
 
-Examples functions at http server
+Examples functions at http server:
 
 ## GET Method Example
  
@@ -42,5 +36,4 @@ Increasing log level to "Verbose" should produce lots of output related to reque
 
 # License
 
-GPL, see [LICENSE](LICENSE) file. Mostly because this is a very early version. Will be relicensed as something more reasonable later.
-
+GPL, see [LICENSE](LICENSE) file. Mostly because this is a very early version. Will be relicensed as something more reasonable later. mbedTLS are Apache 2.0 licensed. 
