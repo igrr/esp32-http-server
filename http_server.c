@@ -132,11 +132,6 @@ struct http_server_context_ {
 #endif
 };
 
-#define SERVER_STARTED_BIT 	BIT(0)
-#define SERVER_DONE_BIT 	BIT(1)
-#define SERVER_ERR_NO_MEM 	BIT(2)
-
-
 static const char* http_response_code_to_str(int code);
 static esp_err_t add_keyval_pair(http_header_list_t *list, const char* name, const char* val);
 
@@ -1150,7 +1145,9 @@ static void http_server(void *arg)
 			ESP_LOGV(TAG, "OK");
 
 			xEventGroupSetBits(ctx->start_done, SERVER_STARTED_BIT);
-		reset:
+reset:
+			ESP_LOGI(TAG, "Clearing SERVER_PROCESSING_REQUEST bit...");
+			xEventGroupClearBits(ctx->start_done, SERVER_PROCESSING_REQUEST);
 			ESP_LOGI(TAG, "mbedTLS HTTPS server is running! Waiting for new connection...");
 			do {
 				mbedtls_net_free( ctx->connection_context.client_fd );
@@ -1166,6 +1163,8 @@ static void http_server(void *arg)
 					ESP_LOGE(TAG, "ERROR: mbedtls_net_accept returned %d", ret );
 					goto exit;
 				}
+				ESP_LOGI(TAG, "Setting SERVER_PROCESSING_REQUEST bit...");
+				xEventGroupSetBits(ctx->start_done, SERVER_PROCESSING_REQUEST);
 				mbedtls_ssl_set_bio( ctx->connection_context.ssl_conn, ctx->connection_context.client_fd, mbedtls_net_send, mbedtls_net_recv, NULL );
 				ESP_LOGV(TAG, "OK");
 
@@ -1186,10 +1185,12 @@ static void http_server(void *arg)
 				if (ret == ERR_OK) {
 					http_handle_connection(ctx, NULL);
 				}
+				ESP_LOGI(TAG, "Clearing SERVER_PROCESSING_REQUEST bit...");
+				xEventGroupClearBits(ctx->start_done, SERVER_PROCESSING_REQUEST);
 				ESP_LOGV(TAG, "OK");
 			} while (ret == ERR_OK);
 
-		exit:
+exit:
 			if (ret != ERR_OK) {
 				error_buf = malloc(sizeof(char)*ERROR_BUF_LENGTH);
 				mbedtls_strerror( ret, error_buf, sizeof(char)*ERROR_BUF_LENGTH );
@@ -1199,6 +1200,8 @@ static void http_server(void *arg)
 				//Set SERVER_DONE_BIT and save error at http_server_t struct
 				ctx->server_task_err = ret;
 				xEventGroupSetBits(ctx->start_done, SERVER_DONE_BIT);
+				ESP_LOGI(TAG, "Clearing SERVER_PROCESSING_REQUEST bit...");
+				xEventGroupClearBits(ctx->start_done, SERVER_PROCESSING_REQUEST);
 			}
 
 			mbedtls_net_free( ctx->connection_context.client_fd );
@@ -1215,8 +1218,7 @@ static void http_server(void *arg)
 #endif
 			mbedtls_ctr_drbg_free( ctx->ctr_drbg );
 			mbedtls_entropy_free( ctx->entropy );
-
-	#else
+#else
 			struct netconn *client_conn;
 			err_t err;
 			ctx->server_conn = netconn_new(NETCONN_TCP);
@@ -1239,8 +1241,12 @@ static void http_server(void *arg)
 			do {
 				err = netconn_accept(ctx->server_conn, &client_conn);
 				if (err == ERR_OK) {
+					ESP_LOGI(TAG, "Setting SERVER_PROCESSING_REQUEST bit...");
+					xEventGroupSetBits(ctx->start_done, SERVER_PROCESSING_REQUEST);
 					http_handle_connection(ctx, client_conn);
 					netconn_delete(client_conn);
+					ESP_LOGI(TAG, "Clearing SERVER_PROCESSING_REQUEST bit...");
+					xEventGroupClearBits(ctx->start_done, SERVER_PROCESSING_REQUEST);
 				}
 			} while (err == ERR_OK);
 		out:
@@ -1250,6 +1256,8 @@ static void http_server(void *arg)
 			}
 			if (err != ERR_OK) {
 				ctx->server_task_err = err;
+				ESP_LOGI(TAG, "Clearing SERVER_PROCESSING_REQUEST bit...");
+				xEventGroupClearBits(ctx->start_done, SERVER_PROCESSING_REQUEST);
 				xEventGroupSetBits(ctx->start_done, SERVER_DONE_BIT);
 			}
 			vTaskDelete(NULL);
@@ -1385,4 +1393,24 @@ esp_err_t simple_POST_method_example(void)
 	}
 
 	return res;
+}
+
+/**
+  * @brief     	Check if a request is being attended and returns it
+  *
+  * @param		Current HTTP(S) server context
+  *
+  * @return 	a uint8_t variable indicating if server is processing any request
+  */
+uint8_t check_processing_request(http_server_t server)
+{
+    if(xEventGroupWaitBits(server->start_done, SERVER_PROCESSING_REQUEST, 0, 0, 0) & SERVER_PROCESSING_REQUEST)			//If a request was not finished properly, returns an error
+    {
+    	ESP_LOGI(TAG, "Processing Server Request");
+    	return true;
+    }else
+    {
+    	ESP_LOGI(TAG, "No Server Request");
+    	return false;
+    }
 }

@@ -41,6 +41,14 @@ extern "C" {
 #define HTTP_HANDLE_DATA        BIT(2)      /*!< Called each time a fragment of request body is received */
 #define HTTP_HANDLE_RESPONSE    BIT(3)      /*!< Called at the end of the request to produce the response */
 
+/**
+ * Bit masks for server event handler
+ */
+#define SERVER_STARTED_BIT 			BIT(0)
+#define SERVER_DONE_BIT 			BIT(1)
+#define SERVER_ERR_NO_MEM 			BIT(2)
+#define SERVER_PROCESSING_REQUEST	BIT(3)
+
 /** Error buffer length */
 #define ERROR_BUF_LENGTH 		100
 
@@ -337,6 +345,15 @@ esp_err_t simple_GET_method_example(void);
  *      - other errors in the future?
  */
 esp_err_t simple_POST_method_example(void);
+
+/**
+  * @brief     	Check if a request is being attended and returns it
+  *
+  * @param		Current HTTP(S) server context
+  *
+  * @return 	a uint8_t variable indicating if server is processing any request
+  */
+uint8_t check_processing_request(http_server_t server);
 
 #ifdef __cplusplus
 }
