@@ -132,6 +132,23 @@ struct http_server_context_ {
 #endif
 };
 
+/** Return true if \p ret is a status code indicating that there is an
+ * operation in progress on an SSL connection, and false if it indicates
+ * success or a fatal error.
+ *
+ * The possible operations in progress are:
+ *
+ * - A read, when the SSL input buffer does not contain a full message.
+ * - A write, when the SSL output buffer contains some data that has not
+ *   been sent over the network yet.
+ * - An asynchronous callback that has not completed yet. */
+static int mbedtls_status_is_ssl_in_progress( int ret )
+{
+    return( ret == MBEDTLS_ERR_SSL_WANT_READ ||
+            ret == MBEDTLS_ERR_SSL_WANT_WRITE );
+}
+
+
 static const char* http_response_code_to_str(int code);
 static esp_err_t add_keyval_pair(http_header_list_t *list, const char* name, const char* val);
 
@@ -768,6 +785,9 @@ static const char* http_response_code_to_str(int code)
 static void http_handle_connection(http_server_t server, void *arg_conn)
 {
 	unsigned char *buf;
+	unsigned char *larger_buf;
+    size_t len = 0;
+
     /* Single threaded server, one context only */
     http_context_t ctx = &server->connection_context;
 
@@ -801,9 +821,11 @@ static void http_handle_connection(http_server_t server, void *arg_conn)
 	 */
 
 	ret = 0;
+	buf = malloc(sizeof(char)*MBEDTLS_EXAMPLE_RECV_BUF_LEN);
+
 	while (ctx->state != HTTP_REQUEST_DONE) {
     	ESP_LOGV(TAG, "Reading from client..." );
-		buf = malloc(sizeof(char)*MBEDTLS_EXAMPLE_RECV_BUF_LEN);
+/*
 		memset( buf, 0, sizeof(char)*MBEDTLS_EXAMPLE_RECV_BUF_LEN);
 		//FIXME: add support for buffer > MBEDTLS_EXAMPLE_RECV_BUF_LEN
 		ret = mbedtls_ssl_read( server->connection_context.ssl_conn, buf, MBEDTLS_EXAMPLE_RECV_BUF_LEN);
@@ -830,13 +852,107 @@ static void http_handle_connection(http_server_t server, void *arg_conn)
 
 			break;
 		}
+*/
+		do
+		{
+			int terminated = 0;
+			len = sizeof(char)*MBEDTLS_EXAMPLE_RECV_BUF_LEN;
+			memset( buf, 0, sizeof(char)*MBEDTLS_EXAMPLE_RECV_BUF_LEN);
+			ret = mbedtls_ssl_read( server->connection_context.ssl_conn, buf, len );
 
-		ESP_LOGD(TAG, "%d bytes read: \n%s", ret, (char *) buf );
+			if( mbedtls_status_is_ssl_in_progress( ret ) )
+			{
+				continue;
+			}
+
+			if( ret <= 0 )
+			{
+				switch( ret )
+				{
+					case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
+						ESP_LOGW(TAG, "Error: connection was closed gracefully" );
+						break;
+
+					case MBEDTLS_ERR_NET_CONN_RESET:
+						ESP_LOGW(TAG, "Error: connection was reset by peer" );
+						break;
+
+					default:
+						ESP_LOGW(TAG, "Error: mbedtls_ssl_read returned -0x%x\n", -ret );
+						break;
+				}
+			}
+
+			if( mbedtls_ssl_get_bytes_avail( server->connection_context.ssl_conn ) == 0 )
+			{
+				len = ret;
+				buf[len] = '\0';
+				ESP_LOGI(TAG, "%d bytes read: \n%s", len, (char *) buf );
+				/* End of message should be detected according to the syntax of the
+				 * application protocol (eg HTTP), just use a dummy test here. */
+				if( buf[len - 1] == '\n' )
+					terminated = 1;
+			}
+			else
+			{
+				size_t extra_len, ori_len;
+
+				ori_len = ret;
+				extra_len = (size_t) mbedtls_ssl_get_bytes_avail( server->connection_context.ssl_conn );
+
+				larger_buf = mbedtls_calloc( 1, ori_len + extra_len + 1 );
+				if( larger_buf == NULL )
+				{
+					ESP_LOGE(TAG, "Failed to allocate larger_buf");
+					len = 0;
+					break;
+				}
+
+				memset( larger_buf, 0, ori_len + extra_len );
+				memcpy( larger_buf, buf, ori_len );
+
+				if(buf)														//Free original buffer;
+					free(buf);
+
+				/* This read should never fail and get the whole cached data */
+				ret = mbedtls_ssl_read( server->connection_context.ssl_conn, larger_buf + ori_len, extra_len );
+				if( ret != extra_len ||
+					mbedtls_ssl_get_bytes_avail( server->connection_context.ssl_conn ) != 0 )
+				{
+					ESP_LOGE(TAG, "Failed on cached data");
+					len = 0;
+					break;
+				}
+
+				larger_buf[ori_len + extra_len] = '\0';
+
+				/* End of message should be detected according to the syntax of the
+				 * application protocol (eg HTTP), just use a dummy test here. */
+				if( larger_buf[ori_len + extra_len - 1] == '\n' )
+				{
+					terminated = 1;
+					len = ori_len + extra_len;
+					buf = larger_buf;
+				}
+
+				ESP_LOGI(TAG, "%d bytes read (%d + %d): \n%s", len,
+						ori_len, extra_len, (char *) buf );
+			}
+
+			if( terminated )
+			{
+				break;
+			}
+		}
+		while( 1 );
+
+		if( len == 0 )										//If output buffer length is 0 (indicating a error), finishes processing of this request
+			break;
 
     	ESP_LOGI(TAG, "Calling http_parser_execute...");
-		parsed_bytes = http_parser_execute(&ctx->parser, &parser_settings, (char *)buf, ret);
+		parsed_bytes = http_parser_execute(&ctx->parser, &parser_settings, (char *)buf, len);
 	}
-	ESP_LOGD(TAG, "Read looping return: %d", parsed_bytes);
+	ESP_LOGD(TAG, "Read looping returned: %d", parsed_bytes);
 
 #else //HTPPS SERVER OFF
 	while (ctx->state != HTTP_REQUEST_DONE) {
@@ -858,7 +974,7 @@ static void http_handle_connection(http_server_t server, void *arg_conn)
 #endif
 
 #ifdef HTTPS_SERVER
-    if (ret > 0) {
+    if (len > 0) {
         ctx->state = HTTP_COLLECTING_RESPONSE_HEADERS;
         if (ctx->handler == NULL) {
         	ESP_LOGD(TAG, "No registered Handler!");
@@ -902,6 +1018,8 @@ static void http_handle_connection(http_server_t server, void *arg_conn)
 		}
 	}
 	ESP_LOGI(TAG, "OK");
+	if(buf)
+		free(buf);
 #else
     if (err != ERR_CLSD) {
         netconn_close(ctx->conn);
