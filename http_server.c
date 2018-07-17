@@ -856,7 +856,7 @@ static void http_handle_connection(http_server_t server, void *arg_conn)
 		do
 		{
 			int terminated = 0;
-			len = sizeof(char)*MBEDTLS_EXAMPLE_RECV_BUF_LEN;
+			len = sizeof(char)*MBEDTLS_EXAMPLE_RECV_BUF_LEN - 1;
 			memset( buf, 0, sizeof(char)*MBEDTLS_EXAMPLE_RECV_BUF_LEN);
 			ret = mbedtls_ssl_read( server->connection_context.ssl_conn, buf, len );
 
@@ -888,10 +888,6 @@ static void http_handle_connection(http_server_t server, void *arg_conn)
 				len = ret;
 				buf[len] = '\0';
 				ESP_LOGI(TAG, "%d bytes read: \n%s", len, (char *) buf );
-				/* End of message should be detected according to the syntax of the
-				 * application protocol (eg HTTP), just use a dummy test here. */
-				if( buf[len - 1] == '\n' )
-					terminated = 1;
 			}
 			else
 			{
@@ -928,16 +924,17 @@ static void http_handle_connection(http_server_t server, void *arg_conn)
 
 				/* End of message should be detected according to the syntax of the
 				 * application protocol (eg HTTP), just use a dummy test here. */
-				if( larger_buf[ori_len + extra_len - 1] == '\n' )
-				{
-					terminated = 1;
-					len = ori_len + extra_len;
-					buf = larger_buf;
-				}
+				buf = larger_buf;
+				len = ori_len + extra_len;
 
 				ESP_LOGI(TAG, "%d bytes read (%d + %d): \n%s", len,
 						ori_len, extra_len, (char *) buf );
 			}
+
+			ESP_LOGI(TAG, "Calling http_parser_execute...");
+			parsed_bytes = http_parser_execute(&ctx->parser, &parser_settings, (char *)buf, len);
+			//TODO: check content-length to properly terminate HTTP request
+			terminated = 1;
 
 			if( terminated )
 			{
@@ -948,9 +945,6 @@ static void http_handle_connection(http_server_t server, void *arg_conn)
 
 		if( len == 0 )										//If output buffer length is 0 (indicating a error), finishes processing of this request
 			break;
-
-    	ESP_LOGI(TAG, "Calling http_parser_execute...");
-		parsed_bytes = http_parser_execute(&ctx->parser, &parser_settings, (char *)buf, len);
 	}
 	ESP_LOGD(TAG, "Read looping returned: %d", parsed_bytes);
 
