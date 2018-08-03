@@ -27,6 +27,9 @@ extern "C" {
  * @brief Simple HTTP server
  */
 
+#include "sdkconfig.h"
+#include "esp_system.h"
+
 /* Pull in the definitions of HTTP methods */
 #include "http_parser.h"
 
@@ -37,6 +40,20 @@ extern "C" {
 #define HTTP_HANDLE_HEADERS     BIT(1)      /*!< Called when all headers are received */
 #define HTTP_HANDLE_DATA        BIT(2)      /*!< Called each time a fragment of request body is received */
 #define HTTP_HANDLE_RESPONSE    BIT(3)      /*!< Called at the end of the request to produce the response */
+
+/**
+ * Bit masks for server event handler
+ */
+#define SERVER_STARTED_BIT 			BIT(0)
+#define SERVER_DONE_BIT 			BIT(1)
+#define SERVER_ERR_NO_MEM 			BIT(2)
+#define SERVER_PROCESSING_REQUEST	BIT(3)
+
+/** Error buffer length */
+#define ERROR_BUF_LENGTH 		100
+
+/** Uncomment to enable secure server */
+#define HTTPS_SERVER
 
 /** Opaque type representing single HTTP connection */
 typedef struct http_context_* http_context_t;
@@ -64,6 +81,32 @@ typedef struct {
     .task_stack_size = 4096, \
     .task_priority = 1, \
 }
+
+/** Default initializer for http_server_options_t */
+#define HTTPS_SERVER_OPTIONS_DEFAULT()  {\
+    .port = 443, \
+    .task_affinity = tskNO_AFFINITY, \
+    .task_stack_size = 10240, \
+    .task_priority = 8, \
+}
+
+const static char index_html[] = "<!DOCTYPE html>"
+      "<html>\n"
+      "<head>\n"
+      "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+      "  <style type=\"text/css\">\n"
+      "    html, body, iframe { margin: 0; padding: 0; height: 100%; }\n"
+      "    iframe { display: block; width: 100%; border: none; }\n"
+      "  </style>\n"
+      "<title>HELLO ESP32</title>\n"
+      "</head>\n"
+      "<body>\n"
+      "<h1>Hello World, from ESP32!</h1>\n"
+      "</body>\n"
+      "</html>\n";
+
+const static char response_OK[] =
+	"OK!\n";
 
 /**
  * @brief initialize HTTP server, start listening
@@ -284,6 +327,33 @@ esp_err_t http_response_write(http_context_t http_ctx, const http_buffer_t* buff
  *      - other errors in the future?
  */
 esp_err_t http_response_end(http_context_t http_ctx);
+
+/**
+ * @brief Example of GET method. Responding a simple "Hello World" html. All initializations included.
+ * @param none
+ * @return
+ *      - ESP_OK on success
+ *      - other errors in the future?
+ */
+esp_err_t simple_GET_method_example(void);
+
+/**
+ * @brief Example of POST method. Send a application/x-www-form-urlencoded pair key-value where the key is 'key' and some value for it. The value is printed and the server responds a 201 code and a OK message.
+ * @param none
+ * @return
+ *      - ESP_OK on success
+ *      - other errors in the future?
+ */
+esp_err_t simple_POST_method_example(void);
+
+/**
+  * @brief     	Check if a request is being attended and returns it
+  *
+  * @param		Current HTTP(S) server context
+  *
+  * @return 	a uint8_t variable indicating if server is processing any request
+  */
+uint8_t check_processing_request(http_server_t server);
 
 #ifdef __cplusplus
 }
