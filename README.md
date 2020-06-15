@@ -1,3 +1,10 @@
+Notice
+------
+
+ESP-IDF includes an [HTTP(S) server component](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/protocols/esp_http_server.html) since version 3.2, so this repository is no longer maintained.
+
+---
+
 Simple HTTP server
 ------------------
 
